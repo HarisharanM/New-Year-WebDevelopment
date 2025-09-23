@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import Lighting from "./Lighting";
 import {
   saveParticipant,
@@ -11,8 +11,14 @@ import logoImage from "../assets/logo.png";
 import QRCode from "qrcode";
 import jsPDF from "jspdf";
 
+// Toggle this to true to bypass online payment and accept cash at entry.
+// Set to false to use the normal Razorpay flow.
+const SKIP_PAYMENT = true;
+
 export default function Page() {
   const formRef = useRef(null);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successParticipantId, setSuccessParticipantId] = useState(null);
 
   const generatePass = async (participantId, data, paymentId, totalAmount) => {
     try {
@@ -115,7 +121,39 @@ export default function Page() {
       const pricePerPerson = data.passType === "Sitting" ? 100 : 50;
       const totalAmount = data.numberOfPeople * pricePerPerson;
 
-      // Open Razorpay
+      // If SKIP_PAYMENT is enabled, bypass Razorpay and save directly with a cash marker.
+      if (SKIP_PAYMENT) {
+        try {
+          const participantId = await saveParticipant({
+            ...data,
+            paymentId: "CASH",
+            amountPaid: 0,
+            isUsed: false,
+          });
+
+          const passUrl = await generatePass(participantId, data, "CASH", 0);
+
+          // Open and auto-download pass
+          window.open(passUrl, "_blank");
+          const link = document.createElement("a");
+          link.href = passUrl;
+          link.download = `PaawanGarbaPass_${participantId}.pdf`;
+          link.click();
+
+          // Show big modal success card
+          setSuccessParticipantId(participantId);
+          setShowSuccess(true);
+
+          form.reset();
+        } catch (err) {
+          console.error(err);
+          alert("Error saving participant or generating pass.");
+        }
+
+        return; // ensure we don't run the normal payment flow
+      }
+
+      // Open Razorpay (original flow) - unchanged
       openRazorpay(
         totalAmount,
         data,
@@ -139,7 +177,7 @@ export default function Page() {
 
             const link = document.createElement("a");
             link.href = passUrl;
-            link.download = `GarbaPass_${participantId}.pdf`;
+            link.download = `PaawanGarbaPass_${participantId}.pdf`;
             link.click();
 
             form.reset();
@@ -165,22 +203,53 @@ export default function Page() {
 
       {/* HEADER */}
       <header className="bg-[#800000] pb-4 pt-0 shadow-md text-center relative z-10">
-        <h1 className="text-4xl text-white pt-0 font-d">
-          Paawan Garba Utsav 2025
-        </h1>
+        <h1 className="text-4xl text-white pt-0 font-d">Paawan Garba Utsav 2025</h1>
       </header>
 
       {/* MARQUEE */}
       <div className="bg-[#F8EDEB] text-[#7D5A5A] py-2 font-semibold overflow-hidden relative">
         <div className="whitespace-nowrap animate-marquee font-b">
           <span className="mx-10">⚡ Limited Seats Available! Book Now!</span>
-          <span className="mx-10">
-            💃 Venue: Shree D Sadan Dharmpal Ji Ka Bada Shahdol MP
-          </span>
+          <span className="mx-10">💃 Venue: Shree D Sadan Dharmpal Ji Ka Bada Shahdol MP</span>
           <span className="mx-10">🎶 Live DJ & Special Performances!</span>
           <span className="mx-10">✨ Date: 23 & 24 September</span>
         </div>
       </div>
+
+      {/* SUCCESS MODAL */}
+      {showSuccess && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center relative">
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 flex items-center justify-center rounded-full bg-green-100">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-10 w-10 text-green-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+            </div>
+            <h3 className="text-2xl font-bold text-green-700 mb-2">Pass Booked Successfully!</h3>
+            <p className="text-gray-700 mb-4">
+              Your pass is booked successfully. Enjoy Paawan Garba Night with cash payment at the entry. You have downloaded a pass which must be used at the entry gate.
+            </p>
+            {successParticipantId && (
+              <p className="text-sm text-gray-500 mb-4">Pass ID: {successParticipantId}</p>
+            )}
+            <button
+              onClick={() => setShowSuccess(false)}
+              className="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* HERO / BG IMAGE */}
       <section
@@ -215,14 +284,10 @@ export default function Page() {
       >
         {/* Booking Form */}
         <div className="bg-white shadow-xl rounded-lg p-8 w-full max-w-lg border border-[#E6D5C3]">
-          <h2 className="text-2xl font-bold text-center mb-6 text-[#A7727D] font-a">
-            Book Your Garba Entry
-          </h2>
+          <h2 className="text-2xl font-bold text-center mb-6 text-[#A7727D] font-a">Book Your Garba Entry</h2>
           <form onSubmit={handleSubmit} className="space-y-4 font-l">
             <div>
-              <label className="block font-semibold mb-1 text-[#7D5A5A]">
-                Name
-              </label>
+              <label className="block font-semibold mb-1 text-[#7D5A5A]">Name</label>
               <input
                 type="text"
                 name="name"
@@ -231,9 +296,7 @@ export default function Page() {
               />
             </div>
             <div>
-              <label className="block font-semibold mb-1 text-[#7D5A5A]">
-                Pass Type
-              </label>
+              <label className="block font-semibold mb-1 text-[#7D5A5A]">Pass Type</label>
               <select
                 name="passType"
                 required
@@ -245,9 +308,7 @@ export default function Page() {
               </select>
             </div>
             <div>
-              <label className="block font-semibold mb-1 text-[#7D5A5A]">
-                Mobile
-              </label>
+              <label className="block font-semibold mb-1 text-[#7D5A5A]">Mobile</label>
               <input
                 type="tel"
                 name="mobile"
@@ -256,9 +317,7 @@ export default function Page() {
               />
             </div>
             <div>
-              <label className="block font-semibold mb-1 text-[#7D5A5A]">
-                No. of People
-              </label>
+              <label className="block font-semibold mb-1 text-[#7D5A5A]">No. of People</label>
               <input
                 type="number"
                 name="numberOfPeople"
@@ -280,9 +339,7 @@ export default function Page() {
 
         {/* Pricing Card */}
         <div className="bg-white shadow-lg rounded-lg p-6 w-full max-w-sm border border-[#E6D5C3] text-center">
-          <h3 className="text-3xl font-bold text-[#7D5A5A] mb-4 font-q">
-            Pass Rates
-          </h3>
+          <h3 className="text-3xl font-bold text-[#7D5A5A] mb-4 font-q">Pass Rates</h3>
           <div className="space-y-4">
             <div className="p-4 border rounded-lg bg-[#F8EDEB] transition">
               <p className="font-semibold text-[#7A5C58]">Sitting</p>
