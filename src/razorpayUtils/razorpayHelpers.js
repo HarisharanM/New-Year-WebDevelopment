@@ -1,5 +1,4 @@
-import logoImage from "../assets/logo.png";
-
+import logoImage from "../assets/logo_New.png";
 
 export const loadRazorpay = () => {
   return new Promise((resolve) => {
@@ -11,42 +10,48 @@ export const loadRazorpay = () => {
   });
 };
 
-
-export const openRazorpay = async (amount, participantData, onSuccess, onFailure) => {
+export const openRazorpay = async (
+  amount,
+  participantData,
+  onSuccess,
+  onFailure
+) => {
   const loaded = await loadRazorpay();
   if (!loaded) {
     alert("Razorpay SDK failed to load. Are you online?");
     return;
   }
 
- 
-  const prefill = {
-    name: participantData.name || "",
-    contact: participantData.mobile || "",
-  };
+  const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY;
 
-
-  const tool = import.meta.env.VITE_tool;
+  if (!razorpayKey) {
+    alert("Razorpay key is missing. Check your .env file.");
+    return;
+  }
   
+  console.log("Razorpay Key:", import.meta.env.VITE_RAZORPAY_KEY);
 
-  
+
   const options = {
-    key: tool, 
-    amount: amount * 100, 
+    key: razorpayKey,
+    amount: amount * 100,
     currency: "INR",
-    name: "Paawan Garba Utsav 2025 ",
-    description: "Garba Pass Booking",
-    image: logoImage || "",
+    name: "New Year’s Eve Celebration 2025 → 2026",
+    description: "Grand Countdown Night Entry Pass",
+    image: logoImage,
     handler: function (response) {
       console.log("Payment Success:", response);
       onSuccess(response);
     },
-    prefill: prefill,
+    prefill: {
+      name: participantData.name || "",
+      contact: participantData.mobile || "",
+    },
     notes: {
       groupSize: participantData.groupSize || 1,
     },
     theme: {
-      color: "#B5838D",
+      color: "#0B132B",
     },
   };
 
@@ -58,3 +63,4 @@ export const openRazorpay = async (amount, participantData, onSuccess, onFailure
     onFailure(err);
   }
 };
+
