@@ -80,11 +80,12 @@ export default function Page() {
   const form = e.target;
 
   const data = {
-    name: form.name.value,
-    mobile: form.mobile.value,
-    passType: form.passType.value,
-    numberOfPeople: parseInt(form.numberOfPeople.value, 10),
-  };
+  name: form.name.value,
+  mobile: form.mobile.value,
+  passType: form.passType.value,
+  numberOfPeople: parseInt(form.numberOfPeople.value, 10),
+  venueId: form.venue.value,
+};
 
   // 🔴 PAYMENT FLOW
   if (!SKIP_PAYMENT) {
@@ -240,6 +241,16 @@ export default function Page() {
                 required
                 className="w-full bg-white/90 border border-[#FFD36A]/40 p-2 rounded"
               />
+              <select
+                name="venue"
+                required
+                className="w-full bg-white/90 border border-[#FFD36A]/40 p-2 rounded"
+              >
+                <option value="">Select Venue</option>
+                <option value="bhopal">Bhopal – Lake View Club</option>
+                <option value="mumbai">Mumbai – Skyline Arena</option>
+              </select>
+
               <select
                 name="passType"
                 required
