@@ -5,6 +5,12 @@ import { openRazorpay } from "../razorpayUtils/razorpayHelpers";
 import eventImage from "../assets/hero-fireworks.png";
 import fireworksBg from "../assets/fireworks-illustration.png";
 import logoImage from "../assets/logo_New.png";
+import TicketPage from "../pages/TicketPage";
+import Navbar from "./Navbar";
+import { useAuth } from "../context/AuthContext";
+
+
+
 
 import QRCode from "qrcode";
 import jsPDF from "jspdf";
@@ -13,6 +19,8 @@ const SKIP_PAYMENT = false;
 
 export default function Page() {
   const formRef = useRef(null);
+  const { user, loginWithGoogle } = useAuth();
+  const [loginError, setLoginError] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successParticipantId, setSuccessParticipantId] = useState(null);
 
@@ -74,51 +82,48 @@ export default function Page() {
     return URL.createObjectURL(doc.output("blob"));
   };
 
-  /* ---------------- FORM SUBMIT ---------------- */
-  const handleSubmit = async (e) => {
+ const handleSubmit = async (e) => {
   e.preventDefault();
-  const form = e.target;
 
-  const data = {
-  name: form.name.value,
-  mobile: form.mobile.value,
-  passType: form.passType.value,
-  numberOfPeople: parseInt(form.numberOfPeople.value, 10),
-  venueId: form.venue.value,
-};
-
-  // 🔴 PAYMENT FLOW
-  if (!SKIP_PAYMENT) {
-    openRazorpay(
-      500, // amount in INR (test)
-      data,
-      async (paymentResponse) => {
-        console.log("Payment Success:", paymentResponse);
-
-        const participantId = await saveParticipant({
-          ...data,
-          paymentId: paymentResponse.razorpay_payment_id,
-          amountPaid: 500,
-          isUsed: false,
-        });
-
-        const passUrl = await generatePass(participantId, data);
-        window.open(passUrl, "_blank");
-
-        setSuccessParticipantId(participantId);
-        setShowSuccess(true);
-        form.reset();
-      },
-      (error) => {
-        console.error("Payment Failed:", error);
-        alert("Payment failed. Please try again.");
-      }
-    );
-
+  // 🔐 LOGIN CHECK (NEW)
+  if (!user) {
+    setLoginError(true);
     return;
   }
 
-  // 🔵 SKIP PAYMENT FLOW (fallback)
+  const form = e.target;
+
+  const data = {
+    name: form.name.value,
+    mobile: form.mobile.value,
+    passType: form.passType.value,
+    numberOfPeople: parseInt(form.numberOfPeople.value, 10),
+    venueId: form.venue.value,
+    userId: user.uid,
+  };
+
+  // ================= PAYMENT FLOW =================
+  if (!SKIP_PAYMENT) {
+    openRazorpay(
+      1,
+      data,
+      async (paymentResponse) => {
+        const participantId = await saveParticipant({
+          ...data,
+          paymentId: paymentResponse.razorpay_payment_id,
+          amountPaid: 1,
+          isUsed: false,
+        });
+
+        // ✅ Redirect to ticket page
+        window.location.href = `/ticket/${participantId}`;
+      },
+      () => alert("Payment failed")
+    );
+    return;
+  }
+
+  // ================= DEV / TEST MODE =================
   const participantId = await saveParticipant({
     ...data,
     paymentId: "NOT DONE YET",
@@ -126,17 +131,20 @@ export default function Page() {
     isUsed: false,
   });
 
-  const passUrl = await generatePass(participantId, data);
-  window.open(passUrl, "_blank");
-
-  setSuccessParticipantId(participantId);
-  setShowSuccess(true);
-  form.reset();
+  // ✅ Redirect to ticket page
+  window.location.href = `/ticket/${participantId}`;
 };
+
+
 
 
   return (
     <div className="text-gray-800">
+    <Navbar />
+    <div className="text-gray-800">
+      {/* existing Page JSX stays EXACTLY the same */}
+    </div>
+
       {/* HEADER */}
       <header className="bg-[#0B132B] py-4 text-center">
         <h1 className="text-4xl text-white">
@@ -306,6 +314,35 @@ export default function Page() {
       )}
 
       <div className="h-px bg-gradient-to-r from-transparent via-yellow-400/40 to-transparent"></div>
+      
+      {loginError && (
+  <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+    <div className="bg-white p-6 rounded-lg text-center max-w-sm">
+      <h3 className="text-xl font-bold mb-3">Login Required</h3>
+      <p className="text-gray-600 mb-4">
+        Please sign in with Google before booking your ticket.
+      </p>
+
+      <button
+        onClick={async () => {
+          setLoginError(false);
+          await loginWithGoogle();
+        }}
+        className="bg-black text-white px-4 py-2 rounded mr-2"
+      >
+        Sign in with Google
+      </button>
+
+      <button
+        onClick={() => setLoginError(false)}
+        className="text-gray-600 px-4 py-2"
+      >
+        Cancel
+      </button>
+    </div>
+  </div>
+)}
+
 
       {/* FOOTER */}
       

@@ -2,6 +2,11 @@ import logoImage from "../assets/logo_New.png";
 
 export const loadRazorpay = () => {
   return new Promise((resolve) => {
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+
     const script = document.createElement("script");
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
     script.onload = () => resolve(true);
@@ -18,38 +23,39 @@ export const openRazorpay = async (
 ) => {
   const loaded = await loadRazorpay();
   if (!loaded) {
-    alert("Razorpay SDK failed to load. Are you online?");
+    alert("Razorpay SDK failed to load");
     return;
   }
 
   const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY;
 
   if (!razorpayKey) {
-    alert("Razorpay key is missing. Check your .env file.");
+    alert("❌ Razorpay key missing. Check .env / Netlify env vars.");
     return;
   }
-  
-  console.log("Razorpay Key:", import.meta.env.VITE_RAZORPAY_KEY);
-
 
   const options = {
     key: razorpayKey,
-    amount: amount * 100,
+    amount: amount * 100, // ✅ MUST be paise
     currency: "INR",
     name: "New Year’s Eve Celebration 2025 → 2026",
-    description: "Grand Countdown Night Entry Pass",
+    description: "Entry Pass",
     image: logoImage,
-    handler: function (response) {
-      console.log("Payment Success:", response);
+
+    handler: (response) => {
+      console.log("✅ Payment Success:", response);
       onSuccess(response);
     },
+
     prefill: {
-      name: participantData.name || "",
-      contact: participantData.mobile || "",
+      name: participantData.name,
+      contact: participantData.mobile,
     },
+
     notes: {
-      groupSize: participantData.groupSize || 1,
+      venue: participantData.venueId,
     },
+
     theme: {
       color: "#0B132B",
     },
@@ -63,4 +69,3 @@ export const openRazorpay = async (
     onFailure(err);
   }
 };
-

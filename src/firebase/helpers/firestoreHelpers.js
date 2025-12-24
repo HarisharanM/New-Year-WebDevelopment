@@ -1,86 +1,97 @@
-
-import { db } from '../firebase';
 import {
   collection,
+  addDoc,
   getDocs,
+  getDoc,
   doc,
-  deleteDoc,
+  serverTimestamp,
   updateDoc,
-  setDoc,
-} from 'firebase/firestore';
+  query,
+  where,
+} from "firebase/firestore";
+import { db } from "../firebase";
 
-
-const participantCollection = collection(db, 'participants');
-
-export const saveParticipant = async (formData, paymentData = null) => {
+/* ================= SAVE PARTICIPANT ================= */
+export async function saveParticipant(data) {
   try {
- 
-    const participantId = `PGU${Date.now()}`;
+    console.log("🔥 Attempting Firebase save:", data);
 
-   
-    const finalData = {
-      participantId,
-      ...formData,
-      createdAt: new Date().toISOString(),
-      ...(paymentData ? { payment: paymentData } : {}), 
+    const docRef = await addDoc(collection(db, "participants"), {
+      ...data,
+      createdAt: serverTimestamp(),
+    });
+
+    console.log("✅ Firebase saved with ID:", docRef.id);
+    return docRef.id;
+  } catch (error) {
+    console.error("❌ Firebase save failed:", error);
+    throw error;
+  }
+}
+
+/* ================= GET ALL PARTICIPANTS ================= */
+export async function getAllParticipants() {
+  try {
+    const snapshot = await getDocs(collection(db, "participants"));
+    return snapshot.docs.map((docSnap) => ({
+      participantId: docSnap.id,
+      ...docSnap.data(),
+    }));
+  } catch (error) {
+    console.error("❌ Fetch failed:", error);
+    return [];
+  }
+}
+
+/* ================= GET PARTICIPANT BY ID (FOR TICKET PAGE & SCAN) ================= */
+export async function getParticipantById(participantId) {
+  try {
+    const docRef = doc(db, "participants", participantId);
+    const docSnap = await getDoc(docRef);
+
+    if (!docSnap.exists()) {
+      console.warn("⚠️ No participant found:", participantId);
+      return null;
+    }
+
+    return {
+      participantId: docSnap.id,
+      ...docSnap.data(),
     };
-
-  
-    await setDoc(doc(db, 'participants', participantId), finalData);
-
-    console.log('Participant saved with ID:', participantId);
-    return participantId;
-  } catch (e) {
-    console.error('Error saving participant:', e);
-    throw e;
+  } catch (error) {
+    console.error("❌ Error fetching participant:", error);
+    return null;
   }
-};
+}
 
-
-export const getAllParticipants = async () => {
+/* ================= UPDATE PARTICIPANT (SCAN PASS) ================= */
+export async function updateParticipant(participantId, updates) {
   try {
-    const snapshot = await getDocs(participantCollection);
-    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-  } catch (e) {
-    console.error('Error fetching participants:', e);
-    throw e;
+    const docRef = doc(db, "participants", participantId);
+    await updateDoc(docRef, updates);
+    console.log("✅ Participant updated:", participantId);
+  } catch (error) {
+    console.error("❌ Update failed:", error);
+    throw error;
   }
-};
+}
 
-
-export const updateParticipant = async (participantId, updatedData) => {
+/* ================= GET USER TICKETS (MY TICKETS PAGE) ================= */
+export async function getUserTickets(userId) {
   try {
-    const docRef = doc(db, 'participants', participantId);
-    await updateDoc(docRef, updatedData);
-    console.log(`Participant ${participantId} updated successfully.`);
-  } catch (e) {
-    console.error('Error updating participant:', e);
-    throw e;
+    const q = query(
+      collection(db, "participants"),
+      where("userId", "==", userId)
+    );
+
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((docSnap) => ({
+      participantId: docSnap.id,
+      ...docSnap.data(),
+    }));
+  } catch (error) {
+    console.error("❌ Error fetching user tickets:", error);
+    return [];
   }
-};
-
-
-export const deleteParticipant = async (participantId) => {
-  try {
-    const docRef = doc(db, 'participants', participantId);
-    await deleteDoc(docRef);
-    console.log(`Participant ${participantId} deleted successfully.`);
-  } catch (e) {
-    console.error('Error deleting participant:', e);
-    throw e;
-  }
-};
-
-// Count booked Sitting seats
-export const getSittingCount = async () => {
-  const snapshot = await db.collection("participants")
-    .where("passType", "==", "Sitting")
-    .get();
-  let total = 0;
-  snapshot.forEach(doc => {
-    total += doc.data().numberOfPeople;
-  });
-  return total;
-};
-
+}
 
